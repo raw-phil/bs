@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type Response struct {
+type response struct {
 	proto        string
 	code         int
 	reasonPhrase string
@@ -18,10 +18,10 @@ type Response struct {
 	body         []byte
 }
 
-func reply(request *Request, baseDir string) (*Response, error) {
+func reply(request *request, baseDir string) (*response, error) {
 
 	if request.proto != "HTTP/1.1" {
-		return r505(), fmt.Errorf("reply() -> %s, %s: HTTP version not supported. 505 sent", request.method, request.path)
+		return addCloseConnection(r505()), fmt.Errorf("reply() -> %s, %s: HTTP version not supported. 505 sent", request.method, request.path)
 	}
 
 	switch request.method {
@@ -40,31 +40,31 @@ func reply(request *Request, baseDir string) (*Response, error) {
 
 }
 
-func generateResponse(request *Request, t time.Duration, baseDir string) (*Response, error) {
+func generateResponse(request *request, t time.Duration, baseDir string) (*response, error) {
 
 	ch := make(chan *struct {
-		response *Response
-		err      error
+		r   *response
+		err error
 	})
 
 	go func() {
-		response, err := reply(request, baseDir)
+		r, err := reply(request, baseDir)
 		ch <- &struct {
-			response *Response
-			err      error
-		}{response: response, err: err}
+			r   *response
+			err error
+		}{r: r, err: err}
 	}()
 
 	select {
 	case result := <-ch:
-		return result.response, result.err
+		return result.r, result.err
 
 	case <-time.After(t):
 		return r500(), fmt.Errorf("generateResponse() -> %s, %s: the server has exceeded the time limit to generate a response. 500 sent", request.method, request.path)
 	}
 }
 
-func replyToOPTIONS(request *Request, baseDir string) (*Response, error) {
+func replyToOPTIONS(request *request, baseDir string) (*response, error) {
 
 	// asterisk (*) refer to the entire server.
 	if request.path != "*" {
@@ -85,7 +85,7 @@ func replyToOPTIONS(request *Request, baseDir string) (*Response, error) {
 		"connection":    {"close"},
 	}
 
-	return &Response{
+	return &response{
 		proto:        "HTTP/1.1",
 		code:         204,
 		reasonPhrase: "No Content",
@@ -95,7 +95,7 @@ func replyToOPTIONS(request *Request, baseDir string) (*Response, error) {
 
 }
 
-func replyToGET(request *Request, baseDir string) (*Response, error) {
+func replyToGET(request *request, baseDir string) (*response, error) {
 
 	path, err := url.QueryUnescape(request.path)
 	if err != nil {
@@ -129,7 +129,7 @@ func replyToGET(request *Request, baseDir string) (*Response, error) {
 		"connection":     {"close"},
 	}
 
-	return &Response{
+	return &response{
 		proto:        "HTTP/1.1",
 		code:         200,
 		reasonPhrase: "OK",
@@ -139,7 +139,7 @@ func replyToGET(request *Request, baseDir string) (*Response, error) {
 
 }
 
-func replyToHEAD(request *Request, baseDir string) (*Response, error) {
+func replyToHEAD(request *request, baseDir string) (*response, error) {
 	path, _ := url.QueryUnescape(request.path)
 
 	path, err := validatePath(baseDir, path)
@@ -165,7 +165,7 @@ func replyToHEAD(request *Request, baseDir string) (*Response, error) {
 		"connection":     {"close"},
 	}
 
-	return &Response{
+	return &response{
 		proto:        "HTTP/1.1",
 		code:         200,
 		reasonPhrase: "OK",
@@ -175,7 +175,7 @@ func replyToHEAD(request *Request, baseDir string) (*Response, error) {
 
 }
 
-func serializeResponse(response *Response) string {
+func serializeResponse(response *response) string {
 
 	r := fmt.Sprintf("%s %d %s\r\n", response.proto, response.code, response.reasonPhrase)
 
@@ -225,7 +225,7 @@ func validatePath(baseDir string, p string) (string, error) {
 	return absPath, nil
 }
 
-func r400() *Response {
+func r400() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
@@ -233,7 +233,7 @@ func r400() *Response {
 		"server":     {"BuggyServer"},
 		"connection": {"close"},
 	}
-	return &Response{
+	return &response{
 		proto:        "HTTP/1.1",
 		code:         400,
 		reasonPhrase: "Bad Request",
@@ -242,7 +242,7 @@ func r400() *Response {
 	}
 }
 
-func r404() *Response {
+func r404() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
@@ -250,7 +250,7 @@ func r404() *Response {
 		"server":     {"BuggyServer"},
 		"connection": {"close"},
 	}
-	return &Response{
+	return &response{
 		proto:        "HTTP/1.1",
 		code:         404,
 		reasonPhrase: "Not Found",
@@ -259,7 +259,7 @@ func r404() *Response {
 	}
 }
 
-func r405() *Response {
+func r405() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
@@ -268,7 +268,7 @@ func r405() *Response {
 		"server":     {"BuggyServer"},
 		"connection": {"close"},
 	}
-	return &Response{
+	return &response{
 		proto:        "HTTP/1.1",
 		code:         405,
 		reasonPhrase: "Method Not Allowed",
@@ -277,7 +277,7 @@ func r405() *Response {
 	}
 }
 
-func r408() *Response {
+func r408() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
@@ -285,7 +285,7 @@ func r408() *Response {
 		"server":     {"BuggyServer"},
 		"connection": {"close"},
 	}
-	return &Response{
+	return &response{
 		proto:        "HTTP/1.1",
 		code:         408,
 		reasonPhrase: "Request Timeout",
@@ -294,7 +294,7 @@ func r408() *Response {
 	}
 }
 
-func r500() *Response {
+func r500() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
@@ -302,7 +302,7 @@ func r500() *Response {
 		"server":     {"BuggyServer"},
 		"connection": {"close"},
 	}
-	return &Response{
+	return &response{
 		proto:        "HTTP/1.1",
 		code:         500,
 		reasonPhrase: "Internal Server Error",
@@ -311,7 +311,7 @@ func r500() *Response {
 	}
 }
 
-func r505() *Response {
+func r505() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
@@ -319,11 +319,17 @@ func r505() *Response {
 		"server":     {"BuggyServer"},
 		"connection": {"close"},
 	}
-	return &Response{
+	return &response{
 		proto:        "HTTP/1.1",
 		code:         505,
 		reasonPhrase: "HTTP Version Not Supported",
 		headers:      headers,
 		body:         make([]byte, 0),
 	}
+}
+
+// Add 'connection: close' header to a response
+func addCloseConnection(r *response) *response {
+	r.headers["connection"] = []string{"close"}
+	return r
 }

@@ -24,7 +24,7 @@ func TestValidatePath(t *testing.T) {
 }
 
 func TestSerializeResponse(t *testing.T) {
-	response := &Response{
+	response := &response{
 		proto:        "HTTP/1.1",
 		code:         200,
 		reasonPhrase: "OK",

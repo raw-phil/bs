@@ -101,37 +101,37 @@ func TestRequestLineParser(t *testing.T) {
 		name          string
 		line          string
 		expectedError error
-		expectedReq   *Request
+		expectedReq   *request
 	}{
 		{
 			name:          "Valid GET request",
 			line:          "GET / HTTP/1.1",
 			expectedError: nil,
-			expectedReq:   &Request{method: "GET", path: "/", proto: "HTTP/1.1", headers: make(map[string][]string)},
+			expectedReq:   &request{method: "GET", path: "/", proto: "HTTP/1.1", headers: make(map[string][]string)},
 		},
 		{
 			name:          "Valid POST request",
 			line:          "POST /login HTTP/1.1",
 			expectedError: nil,
-			expectedReq:   &Request{method: "POST", path: "/login", proto: "HTTP/1.1", headers: make(map[string][]string)},
+			expectedReq:   &request{method: "POST", path: "/login", proto: "HTTP/1.1", headers: make(map[string][]string)},
 		},
 		{
 			name:          "Invalid request line with 2 parts",
 			line:          "GET /",
 			expectedError: fmt.Errorf("requestLineParser(): invalid request line: %q", "GET /"),
-			expectedReq:   &Request{},
+			expectedReq:   &request{},
 		},
 		{
 			name:          "Invalid request line with 4 parts",
 			line:          "GET / HTTP/1.1 extra",
 			expectedError: fmt.Errorf("requestLineParser(): invalid request line: %q", "GET / HTTP/1.1 extra"),
-			expectedReq:   &Request{},
+			expectedReq:   &request{},
 		},
 		{
 			name:          "Invalid empty request line",
 			line:          "",
 			expectedError: fmt.Errorf("requestLineParser(): invalid request line: \"\""),
-			expectedReq:   &Request{},
+			expectedReq:   &request{},
 		},
 	}
 

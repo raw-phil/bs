@@ -10,8 +10,8 @@ import (
 
 func TestStartBuggyServer(t *testing.T) {
 	t.Run("missing baseDir", func(t *testing.T) {
-		bs := &BuggyInstance{
-			config: &BuggyConfig{
+		bs := &buggyInstance{
+			config: &buggyConfig{
 				baseDir:       "",
 				readTimeout:   10,
 				writeTimeout:  10,
@@ -25,8 +25,8 @@ func TestStartBuggyServer(t *testing.T) {
 	})
 
 	t.Run("missing readTimeout", func(t *testing.T) {
-		bs := &BuggyInstance{
-			config: &BuggyConfig{
+		bs := &buggyInstance{
+			config: &buggyConfig{
 				baseDir:       "./foo",
 				readTimeout:   0,
 				writeTimeout:  10,
@@ -41,7 +41,7 @@ func TestStartBuggyServer(t *testing.T) {
 }
 
 func TestSetReadTimeout(t *testing.T) {
-	bs := &BuggyInstance{config: &BuggyConfig{}}
+	bs := &buggyInstance{config: &buggyConfig{}}
 
 	t.Run("Error when listener is not nil", func(t *testing.T) {
 		bs.listener = &net.TCPListener{}
@@ -65,7 +65,7 @@ func TestSetReadTimeout(t *testing.T) {
 }
 
 func TestSetWriteTimeout(t *testing.T) {
-	bs := &BuggyInstance{config: &BuggyConfig{}}
+	bs := &buggyInstance{config: &buggyConfig{}}
 
 	t.Run("Error when listener is not nil", func(t *testing.T) {
 		bs.listener = &net.TCPListener{}
@@ -89,7 +89,7 @@ func TestSetWriteTimeout(t *testing.T) {
 }
 
 func TestSetmaxRequestMiB(t *testing.T) {
-	bs := &BuggyInstance{config: &BuggyConfig{}}
+	bs := &buggyInstance{config: &buggyConfig{}}
 
 	t.Run("Error when listener is not nil", func(t *testing.T) {
 		bs.listener = &net.TCPListener{}
@@ -113,7 +113,7 @@ func TestSetmaxRequestMiB(t *testing.T) {
 }
 
 func TestSetBaseDir(t *testing.T) {
-	bs := &BuggyInstance{config: &BuggyConfig{}}
+	bs := &buggyInstance{config: &buggyConfig{}}
 
 	t.Run("Error when listener is not nil", func(t *testing.T) {
 		bs.listener = &net.TCPListener{}
@@ -136,10 +136,10 @@ func TestSetBaseDir(t *testing.T) {
 
 func TestStopBuggyServer(t *testing.T) {
 	t.Run("Test when listener is nil", func(t *testing.T) {
-		bs := &BuggyInstance{
+		bs := &buggyInstance{
 			listener: nil,
 			quit:     make(chan struct{}),
-			config:   &BuggyConfig{},
+			config:   &buggyConfig{},
 		}
 		err := bs.StopBuggyServer()
 		assert.Error(t, err)
@@ -147,10 +147,10 @@ func TestStopBuggyServer(t *testing.T) {
 	})
 
 	t.Run("Test when quit is nil", func(t *testing.T) {
-		bs := &BuggyInstance{
+		bs := &buggyInstance{
 			listener: &net.TCPListener{},
 			quit:     nil,
-			config:   &BuggyConfig{},
+			config:   &buggyConfig{},
 		}
 		err := bs.StopBuggyServer()
 		assert.Error(t, err)
@@ -159,10 +159,10 @@ func TestStopBuggyServer(t *testing.T) {
 
 	t.Run("Test successful stop", func(t *testing.T) {
 		ln, _ := net.Listen("tcp", "127.0.0.1:0")
-		bs := &BuggyInstance{
+		bs := &buggyInstance{
 			listener: ln,
 			quit:     make(chan struct{}),
-			config:   &BuggyConfig{},
+			config:   &buggyConfig{},
 		}
 		err := bs.StopBuggyServer()
 		assert.NoError(t, err)
@@ -170,10 +170,10 @@ func TestStopBuggyServer(t *testing.T) {
 
 	t.Run("Test StopBuggyServer() called twice", func(t *testing.T) {
 		ln, _ := net.Listen("tcp", "127.0.0.1:0")
-		bs := &BuggyInstance{
+		bs := &buggyInstance{
 			listener: ln,
 			quit:     make(chan struct{}),
-			config:   &BuggyConfig{},
+			config:   &buggyConfig{},
 		}
 		_ = bs.StopBuggyServer()
 		err := bs.StopBuggyServer()
@@ -183,10 +183,10 @@ func TestStopBuggyServer(t *testing.T) {
 
 	t.Run("Test stop on already closed connection", func(t *testing.T) {
 		ln, _ := net.Listen("tcp", "127.0.0.1:8080")
-		bs := &BuggyInstance{
+		bs := &buggyInstance{
 			listener: ln,
 			quit:     make(chan struct{}),
-			config:   &BuggyConfig{},
+			config:   &buggyConfig{},
 		}
 		bs.listener.Close()
 		err := bs.StopBuggyServer()

@@ -12,7 +12,7 @@ import (
 )
 
 // BuggyConfig is the struct that holds the configuration for a BuggyServer.
-type BuggyConfig struct {
+type buggyConfig struct {
 	// The base directory from which static files will be served.
 	baseDir string
 
@@ -29,7 +29,7 @@ type BuggyConfig struct {
 }
 
 // BuggyInstance is the struct that implements the BuggyServer interface.
-type BuggyInstance struct {
+type buggyInstance struct {
 	// The net.Listener that accepts tcp connections.
 	listener net.Listener
 
@@ -37,7 +37,7 @@ type BuggyInstance struct {
 	quit chan struct{}
 
 	// The configuration settings for the server.
-	config *BuggyConfig
+	config *buggyConfig
 }
 
 type BuggyServer interface {
@@ -61,8 +61,8 @@ type BuggyServer interface {
 func NewBuggyServer() BuggyServer {
 
 	// default values
-	return &BuggyInstance{
-		config: &BuggyConfig{
+	return &buggyInstance{
+		config: &buggyConfig{
 			baseDir:       "./",
 			readTimeout:   (1<<63 - 1),
 			writeTimeout:  (1<<63 - 1),
@@ -81,7 +81,7 @@ func NewBuggyServer() BuggyServer {
 //
 //	host: The hostname or IP address on which the server should listen.
 //	port: The port number on which the server should listen.
-func (bs *BuggyInstance) StartBuggyServer(host string, port uint) error {
+func (bs *buggyInstance) StartBuggyServer(host string, port uint) error {
 
 	if bs.config.baseDir == "" ||
 		bs.quit == nil ||
@@ -108,7 +108,7 @@ func (bs *BuggyInstance) StartBuggyServer(host string, port uint) error {
 // SetReadTimeout set the maximum duration in seconds for reading the entire
 // request from the underling connection. If it is exceeded server respond with 408 code.
 // Zero or negative value means there will be no timeout.
-func (bs *BuggyInstance) SetReadTimeout(timeout time.Duration) error {
+func (bs *buggyInstance) SetReadTimeout(timeout time.Duration) error {
 
 	if bs.listener != nil {
 		return fmt.Errorf("SetReadTimeout(): BuggyServer has already been started, you can no longer change its configuration")
@@ -125,7 +125,7 @@ func (bs *BuggyInstance) SetReadTimeout(timeout time.Duration) error {
 // SetWriteTimeout set the maximum duration in seconds the server has to respond.
 // If it is exceeded server respond with 500 code.
 // Zero or negative value means there will be no timeout.
-func (bs *BuggyInstance) SetWriteTimeout(timeout time.Duration) error {
+func (bs *buggyInstance) SetWriteTimeout(timeout time.Duration) error {
 	if bs.listener != nil {
 		return fmt.Errorf("SetWriteTimeout(): BuggyServer has already been started, you can no longer change its configuration")
 	}
@@ -140,7 +140,7 @@ func (bs *BuggyInstance) SetWriteTimeout(timeout time.Duration) error {
 
 // SetmaxRequestMiB set the maximum size of request the server will accept in MiB.
 // Zero or negative value means there will be no maximum request size.
-func (bs *BuggyInstance) SetmaxRequestMiB(size int) error {
+func (bs *buggyInstance) SetmaxRequestMiB(size int) error {
 	if bs.listener != nil {
 		return fmt.Errorf("SetmaxRequestMiB(): BuggyServer has already been started, you can no longer change its configuration")
 	}
@@ -151,7 +151,7 @@ func (bs *BuggyInstance) SetmaxRequestMiB(size int) error {
 
 // SetBaseDir set the base directory from which static files will be served.
 // It accepts relative or absolute path.
-func (bs *BuggyInstance) SetBaseDir(path string) error {
+func (bs *buggyInstance) SetBaseDir(path string) error {
 	if bs.listener != nil {
 		return fmt.Errorf("SetBaseDir(): BuggyServer has already been started, you can no longer change its configuration")
 	}
@@ -177,7 +177,7 @@ func (bs *BuggyInstance) SetBaseDir(path string) error {
 
 }
 
-func (bs *BuggyInstance) handleConnection(conn net.Conn) {
+func (bs *buggyInstance) handleConnection(conn net.Conn) {
 
 	conn.SetReadDeadline(time.Now().Add(bs.config.readTimeout))
 
@@ -189,7 +189,7 @@ func (bs *BuggyInstance) handleConnection(conn net.Conn) {
 
 	}()
 
-	var response *Response
+	var response *response
 
 	var reader io.Reader = conn
 
@@ -226,7 +226,7 @@ func (bs *BuggyInstance) handleConnection(conn net.Conn) {
 
 }
 
-func (bs *BuggyInstance) listenForConn() {
+func (bs *buggyInstance) listenForConn() {
 	for {
 
 		conn, err := bs.listener.Accept()
@@ -247,7 +247,7 @@ func (bs *BuggyInstance) listenForConn() {
 
 }
 
-func (bs *BuggyInstance) StopBuggyServer() (err error) {
+func (bs *buggyInstance) StopBuggyServer() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("StopBuggyServer(): recovered panic: %s", r)
@@ -268,7 +268,7 @@ func (bs *BuggyInstance) StopBuggyServer() (err error) {
 	return nil
 }
 
-func sendResponse(conn net.Conn, response *Response) error {
+func sendResponse(conn net.Conn, response *response) error {
 	if _, err := conn.Write([]byte(serializeResponse(response))); err != nil {
 		return fmt.Errorf("sendResponse(): %s: %w", conn.RemoteAddr(), err)
 	}

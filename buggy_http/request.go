@@ -4,10 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 )
 
-type Request struct {
+type request struct {
 	method  string
 	path    string
 	proto   string
@@ -15,15 +16,15 @@ type Request struct {
 	body    []byte
 }
 
-func requestLineParser(line string) (*Request, error) {
+func requestLineParser(line string) (*request, error) {
 
 	parts := strings.Split(line, " ")
 
 	if len(parts) != 3 {
-		return &Request{}, fmt.Errorf("requestLineParser(): invalid request line: %q", line)
+		return &request{}, fmt.Errorf("requestLineParser(): invalid request line: %q", line)
 	}
 
-	return &Request{
+	return &request{
 		method:  parts[0],
 		path:    parts[1],
 		proto:   parts[2],
@@ -51,21 +52,18 @@ func headerLineParser(line string) (string, []string, error) {
 	return name, value, nil
 }
 
-func requestParser(r io.Reader) (*Request, error) {
+func requestParser(r io.Reader) (*request, error) {
 	reader := bufio.NewReader(r)
 
 	startLine, _, err := reader.ReadLine()
 	if err != nil {
-		return &Request{}, fmt.Errorf("requestParser(): %w", err)
+		return &request{}, fmt.Errorf("requestParser(): %w", err)
 	}
 
 	request, err := requestLineParser(strings.TrimSpace(string(startLine)))
 	if err != nil {
 		return request, fmt.Errorf("requestParser(): %w", err)
 	}
-
-	// After the headers there could be a body BUT we will ignore it since we only accept GET, OPTIONS and HEAD,
-	// and because keep-alive is not implemented and after response the conn is closed.
 
 	for {
 		byteLine, _, err := reader.ReadLine()
@@ -83,9 +81,40 @@ func requestParser(r io.Reader) (*Request, error) {
 			return request, fmt.Errorf("requestParser(): %w", err)
 		}
 
-		request.headers[name] = value
+		if _, ok := request.headers[name]; ok {
+			request.headers[name] = append(request.headers[name], value...)
+		} else {
+			request.headers[name] = value
+		}
 
 	}
 
+	// Check for chunked transfer-encoding
+	if values, ok := request.headers["transfer-encoding"]; ok {
+		for _, value := range values {
+			if strings.ToLower(value) == "chunked" {
+				return request, fmt.Errorf("requestParser(): BuggyServer does not support 'Transfer-Encoding: chunked'")
+			}
+		}
+	}
+
+	// Read body
+	if value, ok := request.headers["content-length"]; ok {
+
+		contentLength, err := strconv.Atoi(value[0])
+		if err != nil {
+			return request, fmt.Errorf("requestParser(): %w", err)
+		}
+
+		request.body = make([]byte, contentLength)
+		_, err = io.ReadFull(reader, request.body)
+		if err != nil {
+			return request, fmt.Errorf("requestParser(): io.ReadFull(): %w", err)
+		}
+	} else {
+		request.body = make([]byte, 0)
+	}
+
+	//fmt.Printf("%+v", request)
 	return request, nil
 }
