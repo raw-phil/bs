@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// BuggyConfig is the struct that holds the configuration for a BuggyServer.
+// [buggyConfig] is the struct that holds the configuration for a BuggyServer.
 type buggyConfig struct {
 	// The base directory from which static files will be served.
 	baseDir string
@@ -28,7 +28,7 @@ type buggyConfig struct {
 	maxRequestMiB int
 }
 
-// BuggyInstance is the struct that implements the BuggyServer interface.
+// [buggyInstance] is the struct that implements the BuggyServer interface.
 type buggyInstance struct {
 	// The net.Listener that accepts tcp connections.
 	listener net.Listener

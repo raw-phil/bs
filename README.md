@@ -9,6 +9,8 @@
                      |___/ |___/ |___/       
                      
 [![Go Reference](https://pkg.go.dev/badge/golang.org/x/example.svg)](https://pkg.go.dev/golang.org/x/example)
+[![Go Report Card](https://goreportcard.com/badge/github.com/raw-phil/bs)](https://goreportcard.com/report/github.com/raw-phil/bs)
+
 
 Free time project for learning [GO](https://go.dev/) language and something more about HTTP/1.1 protocol. 
 
