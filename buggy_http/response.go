@@ -82,7 +82,6 @@ func replyToOPTIONS(request *request, baseDir string) (*response, error) {
 		"cache-control": {"max-age=604800"},
 		"date":          {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
 		"server":        {"BuggyServer"},
-		"connection":    {"close"},
 	}
 
 	return &response{
@@ -126,7 +125,6 @@ func replyToGET(request *request, baseDir string) (*response, error) {
 		"server":         {"BuggyServer"},
 		"content-type":   {mimeType},
 		"content-length": {fmt.Sprintf("%v", len(file))},
-		"connection":     {"close"},
 	}
 
 	return &response{
@@ -162,7 +160,6 @@ func replyToHEAD(request *request, baseDir string) (*response, error) {
 		"server":         {"BuggyServer"},
 		"content-type":   {mimeType},
 		"content-length": {fmt.Sprintf("%v", len(file))},
-		"connection":     {"close"},
 	}
 
 	return &response{
@@ -246,9 +243,8 @@ func r404() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
-		"date":       {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
-		"server":     {"BuggyServer"},
-		"connection": {"close"},
+		"date":   {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
+		"server": {"BuggyServer"},
 	}
 	return &response{
 		proto:        "HTTP/1.1",
@@ -263,10 +259,9 @@ func r405() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
-		"allow":      {"GET", "HEAD", "OPTIONS"},
-		"date":       {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
-		"server":     {"BuggyServer"},
-		"connection": {"close"},
+		"allow":  {"GET", "HEAD", "OPTIONS"},
+		"date":   {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
+		"server": {"BuggyServer"},
 	}
 	return &response{
 		proto:        "HTTP/1.1",
@@ -331,5 +326,12 @@ func r505() *response {
 // Add 'connection: close' header to a response
 func addCloseConnection(r *response) *response {
 	r.headers["connection"] = []string{"close"}
+	return r
+}
+
+// Add 'connection: keep-alive' and 'keep-alive: timeout=X, max=10' headers to a response
+func addKeepAlive(r *response, timeout, max int) *response {
+	r.headers["connection"] = []string{"keep-alive"}
+	r.headers["keep-alive"] = []string{fmt.Sprintf("timeout=%d, max=%d", timeout, max)}
 	return r
 }

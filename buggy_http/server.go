@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -179,7 +180,7 @@ func (bs *buggyInstance) SetBaseDir(path string) error {
 
 func (bs *buggyInstance) handleConnection(conn net.Conn) {
 
-	conn.SetReadDeadline(time.Now().Add(bs.config.readTimeout))
+	log.Println("--------------------- New connection ---------------------")
 
 	defer func() {
 
@@ -189,39 +190,64 @@ func (bs *buggyInstance) handleConnection(conn net.Conn) {
 
 	}()
 
-	var response *response
+	firstRequest := true
 
-	var reader io.Reader = conn
+	for {
+		conn.SetReadDeadline(time.Now().Add(bs.config.readTimeout))
 
-	if bs.config.maxRequestMiB > 0 {
-		reader = io.LimitReader(conn, int64(bs.config.maxRequestMiB)*(1<<20))
-	}
+		var reader io.Reader = conn
 
-	request, err := requestParser(reader)
-	if err != nil {
-		if errors.Is(err, io.EOF) {
-			log.Printf("error: handleConnection(): %s, the underlying connection is closed or the request exceeds maxRequestMiB", conn.RemoteAddr())
-			return
+		if bs.config.maxRequestMiB > 0 {
+			reader = io.LimitReader(conn, int64(bs.config.maxRequestMiB)*(1<<20))
 		}
-		if errors.Is(err, os.ErrDeadlineExceeded) {
-			response = r408()
+
+		var response *response
+
+		request, err := requestParser(reader)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				log.Printf("error: handleConnection(): %s, the underlying connection is closed or the request exceeds maxRequestMiB", conn.RemoteAddr())
+				break
+			}
+			if errors.Is(err, os.ErrDeadlineExceeded) {
+				response = r408()
+			} else {
+				response = r400()
+			}
+			log.Printf("error: handleConnection(): %s. %d sent", err.Error(), response.code)
+
 		} else {
-			response = r400()
-		}
-		log.Printf("error: handleConnection(): %s. %d sent", err.Error(), response.code)
+			response, err = generateResponse(request, bs.config.writeTimeout, bs.config.baseDir)
+			if err != nil {
+				log.Printf("error: handleConnection(): %s", err.Error())
+			}
 
-	} else {
-		response, err = generateResponse(request, bs.config.writeTimeout, bs.config.baseDir)
+			if values, ok := request.headers["connection"]; ok {
+				for _, value := range values {
+					if strings.ToLower(value) == "close" {
+						addCloseConnection(response)
+					}
+				}
+
+			} else if _, ok := response.headers["connection"]; !ok && firstRequest {
+				addKeepAlive(response, int(bs.config.readTimeout), 10)
+				firstRequest = false
+			} else if firstRequest {
+				firstRequest = false
+			}
+		}
+
+		err = sendResponse(conn, response)
 		if err != nil {
 			log.Printf("error: handleConnection(): %s", err.Error())
+		} else {
+			log.Printf("[ %s, %s, %s : %d ]", conn.RemoteAddr(), request.method, request.path, response.code)
 		}
-	}
 
-	err = sendResponse(conn, response)
-	if err != nil {
-		log.Printf("error: handleConnection(): %s", err.Error())
-	} else {
-		log.Printf("[ %s, %s, %s : %d ]", conn.RemoteAddr(), request.method, request.path, response.code)
+		if values, ok := response.headers["connection"]; ok && values[0] == "close" {
+			break
+		}
+
 	}
 
 }
