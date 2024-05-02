@@ -1,6 +1,7 @@
 package buggy_http
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -8,7 +9,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -180,7 +180,7 @@ func (bs *buggyInstance) SetBaseDir(path string) error {
 
 func (bs *buggyInstance) handleConnection(conn net.Conn) {
 
-	log.Println("--------------------- New connection ---------------------")
+	fmt.Println("--------------------- New connection ---------------------")
 
 	defer func() {
 
@@ -192,21 +192,17 @@ func (bs *buggyInstance) handleConnection(conn net.Conn) {
 
 	firstRequest := true
 
+	bufReader := bufio.NewReader(conn)
+
 	for {
 		conn.SetReadDeadline(time.Now().Add(bs.config.readTimeout))
 
-		var reader io.Reader = conn
-
-		if bs.config.maxRequestMiB > 0 {
-			reader = io.LimitReader(conn, int64(bs.config.maxRequestMiB)*(1<<20))
-		}
-
 		var response *response
 
-		request, err := requestParser(reader)
+		request, err := requestParser(bufReader, bs.config.maxRequestMiB)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				log.Printf("error: handleConnection(): %s, the underlying connection is closed or the request exceeds maxRequestMiB", conn.RemoteAddr())
+				log.Printf("error: handleConnection(): %s:%s, the underlying connection is closed", err.Error(), conn.RemoteAddr())
 				break
 			}
 			if errors.Is(err, os.ErrDeadlineExceeded) {
@@ -222,12 +218,8 @@ func (bs *buggyInstance) handleConnection(conn net.Conn) {
 				log.Printf("error: handleConnection(): %s", err.Error())
 			}
 
-			if values, ok := request.headers["connection"]; ok {
-				for _, value := range values {
-					if strings.ToLower(value) == "close" {
-						addCloseConnection(response)
-					}
-				}
+			if headerFinder(request.headers, "connection", "close") {
+				addCloseConnection(response)
 
 			} else if _, ok := response.headers["connection"]; !ok && firstRequest {
 				addKeepAlive(response, int(bs.config.readTimeout), 10)

@@ -52,23 +52,29 @@ func headerLineParser(line string) (string, []string, error) {
 	return name, value, nil
 }
 
-func requestParser(r io.Reader) (*request, error) {
-	reader := bufio.NewReader(r)
+func requestParser(reader *bufio.Reader, maxRequestMiB int) (*request, error) {
 
-	startLine, _, err := reader.ReadLine()
+	var maxRequestBytes int = 0
+	if maxRequestMiB > 0 {
+		maxRequestBytes = maxRequestMiB * (1 << 20)
+	}
+
+	var byteCount int = 0
+
+	startLine, err := readLine(reader, &byteCount, maxRequestBytes)
 	if err != nil {
 		return &request{}, fmt.Errorf("requestParser(): %w", err)
 	}
 
-	request, err := requestLineParser(strings.TrimSpace(string(startLine)))
+	parsedRequest, err := requestLineParser(strings.TrimSpace(string(startLine)))
 	if err != nil {
-		return request, fmt.Errorf("requestParser(): %w", err)
+		return parsedRequest, fmt.Errorf("requestParser(): %w", err)
 	}
 
 	for {
-		byteLine, _, err := reader.ReadLine()
+		byteLine, err := readLine(reader, &byteCount, maxRequestBytes)
 		if err != nil {
-			return request, fmt.Errorf("requestParser(): %w", err)
+			return parsedRequest, fmt.Errorf("requestParser(): %w", err)
 		}
 
 		line := strings.TrimSpace(string(byteLine))
@@ -78,43 +84,73 @@ func requestParser(r io.Reader) (*request, error) {
 
 		name, value, err := headerLineParser(line)
 		if err != nil {
-			return request, fmt.Errorf("requestParser(): %w", err)
+			return parsedRequest, fmt.Errorf("requestParser(): %w", err)
 		}
 
-		if _, ok := request.headers[name]; ok {
-			request.headers[name] = append(request.headers[name], value...)
+		if _, ok := parsedRequest.headers[name]; ok {
+			parsedRequest.headers[name] = append(parsedRequest.headers[name], value...)
 		} else {
-			request.headers[name] = value
+			parsedRequest.headers[name] = value
 		}
 
 	}
 
-	// Check for chunked transfer-encoding
-	if values, ok := request.headers["transfer-encoding"]; ok {
-		for _, value := range values {
-			if strings.ToLower(value) == "chunked" {
-				return request, fmt.Errorf("requestParser(): BuggyServer does not support 'Transfer-Encoding: chunked'")
+	if headerFinder(parsedRequest.headers, "transfer-encoding", "chunked") {
+		return parsedRequest, fmt.Errorf("requestParser(): BuggyServer does not support transfer-encoding: chunked")
+	}
+
+	if err = readBody(reader, parsedRequest); err != nil {
+		return parsedRequest, fmt.Errorf("requestParser(): %w", err)
+	}
+
+	//fmt.Printf("%+v", parsedRequest)
+	return parsedRequest, nil
+}
+
+func readLine(reader *bufio.Reader, byteCount *int, maxRequestBytes int) ([]byte, error) {
+	line, isPrefix, err := reader.ReadLine()
+	if err != nil {
+		return nil, err
+	}
+	if isPrefix {
+		return nil, fmt.Errorf("readLine(): line exceeded max size")
+	}
+	if maxRequestBytes > 0 {
+		*byteCount += len(line)
+		if *byteCount > int(maxRequestBytes) {
+			return nil, fmt.Errorf("readLine(): request exceeded max size")
+		}
+	}
+	return line, nil
+}
+
+// This function serves to find if a heder exist in the headersMap
+// and if it has a given value.
+func headerFinder(headersMap map[string][]string, header, value string) bool {
+	if values, ok := headersMap[strings.ToLower(header)]; ok {
+		for _, v := range values {
+			if strings.EqualFold(v, value) {
+				return true
 			}
 		}
 	}
+	return false
+}
 
-	// Read body
-	if value, ok := request.headers["content-length"]; ok {
-
+func readBody(reader *bufio.Reader, req *request) error {
+	if value, ok := req.headers["content-length"]; ok {
 		contentLength, err := strconv.Atoi(value[0])
 		if err != nil {
-			return request, fmt.Errorf("requestParser(): %w", err)
+			return err
 		}
 
-		request.body = make([]byte, contentLength)
-		_, err = io.ReadFull(reader, request.body)
+		req.body = make([]byte, contentLength)
+		_, err = io.ReadFull(reader, req.body)
 		if err != nil {
-			return request, fmt.Errorf("requestParser(): io.ReadFull(): %w", err)
+			return fmt.Errorf("parseBody(): io.ReadFull(): %w", err)
 		}
 	} else {
-		request.body = make([]byte, 0)
+		req.body = make([]byte, 0)
 	}
-
-	//fmt.Printf("%+v", request)
-	return request, nil
+	return nil
 }
