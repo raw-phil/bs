@@ -103,7 +103,7 @@ func requestParser(reader *bufio.Reader, maxRequestMiB int) (*request, error) {
 		return parsedRequest, fmt.Errorf("requestParser(): %w", err)
 	}
 
-	//fmt.Printf("%+v", parsedRequest)
+	//fmt.Printf("%+v \n %q \n\n", parsedRequest, parsedRequest.body)
 	return parsedRequest, nil
 }
 
@@ -147,7 +147,7 @@ func readBody(reader *bufio.Reader, req *request) error {
 		req.body = make([]byte, contentLength)
 		_, err = io.ReadFull(reader, req.body)
 		if err != nil {
-			return fmt.Errorf("parseBody(): io.ReadFull(): %w", err)
+			return fmt.Errorf("readBody(): %w", err)
 		}
 	} else {
 		req.body = make([]byte, 0)

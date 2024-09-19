@@ -18,28 +18,8 @@ type response struct {
 	body         []byte
 }
 
-func reply(request *request, baseDir string) (*response, error) {
-
-	if request.proto != "HTTP/1.1" {
-		return addCloseConnection(r505()), fmt.Errorf("reply() -> %s, %s: HTTP version not supported. 505 sent", request.method, request.path)
-	}
-
-	switch request.method {
-	case "OPTIONS":
-		return replyToOPTIONS(request, baseDir)
-
-	case "GET":
-		return replyToGET(request, baseDir)
-
-	case "HEAD":
-		return replyToHEAD(request, baseDir)
-
-	default:
-		return r405(), fmt.Errorf("reply() -> %s, %s: HTTP method not allowed. 405 sent", request.method, request.path)
-	}
-
-}
-
+// generateResponse generates a response for a give request.
+// If error is not nil, the returned response have the HTTP code associated with that error.
 func generateResponse(request *request, t time.Duration, baseDir string) (*response, error) {
 
 	ch := make(chan *struct {
@@ -62,6 +42,28 @@ func generateResponse(request *request, t time.Duration, baseDir string) (*respo
 	case <-time.After(t):
 		return r500(), fmt.Errorf("generateResponse() -> %s, %s: the server has exceeded the time limit to generate a response. 500 sent", request.method, request.path)
 	}
+}
+
+func reply(request *request, baseDir string) (*response, error) {
+
+	if request.proto != "HTTP/1.1" {
+		return addCloseConnection(r505()), fmt.Errorf("reply() -> %s, %s: HTTP version not supported. 505 sent", request.method, request.path)
+	}
+
+	switch request.method {
+	case "OPTIONS":
+		return replyToOPTIONS(request, baseDir)
+
+	case "GET":
+		return replyToGET(request, baseDir)
+
+	case "HEAD":
+		return replyToHEAD(request, baseDir)
+
+	default:
+		return r405(), fmt.Errorf("reply() -> %s, %s: HTTP method not allowed. 405 sent", request.method, request.path)
+	}
+
 }
 
 func replyToOPTIONS(request *request, baseDir string) (*response, error) {
@@ -326,12 +328,5 @@ func r505() *response {
 // Add 'connection: close' header to a response
 func addCloseConnection(r *response) *response {
 	r.headers["connection"] = []string{"close"}
-	return r
-}
-
-// Add 'connection: keep-alive' and 'keep-alive: timeout=X, max=10' headers to a response
-func addKeepAlive(r *response, timeout, max int) *response {
-	r.headers["connection"] = []string{"keep-alive"}
-	r.headers["keep-alive"] = []string{fmt.Sprintf("timeout=%d, max=%d", timeout, max)}
 	return r
 }

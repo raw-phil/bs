@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -180,14 +181,10 @@ func (bs *buggyInstance) SetBaseDir(path string) error {
 
 func (bs *buggyInstance) handleConnection(conn net.Conn) {
 
-	fmt.Println("--------------------- New connection ---------------------")
-
 	defer func() {
-
 		if err := conn.Close(); err != nil {
 			log.Printf("error: handleConnection(): conn.Close(): %s: %s", conn.RemoteAddr(), err.Error())
 		}
-
 	}()
 
 	firstRequest := true
@@ -201,7 +198,7 @@ func (bs *buggyInstance) handleConnection(conn net.Conn) {
 
 		request, err := requestParser(bufReader, bs.config.maxRequestMiB)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET) {
 				log.Printf("error: handleConnection(): %s:%s, the underlying connection is closed", err.Error(), conn.RemoteAddr())
 				break
 			}
@@ -222,7 +219,6 @@ func (bs *buggyInstance) handleConnection(conn net.Conn) {
 				addCloseConnection(response)
 
 			} else if _, ok := response.headers["connection"]; !ok && firstRequest {
-				addKeepAlive(response, int(bs.config.readTimeout), 10)
 				firstRequest = false
 			} else if firstRequest {
 				firstRequest = false
