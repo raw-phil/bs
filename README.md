@@ -185,7 +185,7 @@ Zero or negative value means there will be no maximum request size.
 ### Connection reuse and pipelining
 
 BuggyServer supports connection reuse, which allows multiple HTTP requests and responses to be sent over a single TCP connection.   
-This server sends the `connection: keep-alive` header and the `keep-alive` header with a timeout parameter ( equal to `ReadTimeout` )   
+The server sends the `connection: keep-alive` header and the `keep-alive` header with a timeout parameter ( equal to `ReadTimeout` )   
 that indicate the time in seconds that the server will allow an idle connection to remain open before it is closed.   
 
 Additionally, BuggyServer supports pipelined requests, which enable multiple HTTP requests to be sent in a single TCP connection   
