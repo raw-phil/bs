@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -43,8 +44,8 @@ type buggyInstance struct {
 }
 
 type BuggyServer interface {
-	SetReadTimeout(timeout time.Duration) error
-	SetWriteTimeout(timeout time.Duration) error
+	SetReadTimeout(seconds int) error
+	SetWriteTimeout(seconds int) error
 	SetmaxRequestMiB(size int) error
 	SetBaseDir(path string) error
 	StartBuggyServer(host string, port uint) error
@@ -110,33 +111,42 @@ func (bs *buggyInstance) StartBuggyServer(host string, port uint) error {
 // SetReadTimeout set the maximum duration in seconds for reading the entire
 // request from the underling connection. If it is exceeded server respond with 408 code.
 // Zero or negative value means there will be no timeout.
-func (bs *buggyInstance) SetReadTimeout(timeout time.Duration) error {
-
+func (bs *buggyInstance) SetReadTimeout(seconds int) error {
 	if bs.listener != nil {
 		return fmt.Errorf("SetReadTimeout(): BuggyServer has already been started, you can no longer change its configuration")
 	}
-	if timeout <= 0 {
+
+	maxSeconds := (1<<63 - 1) / int(math.Pow(10, 9))
+
+	if seconds <= 0 {
 		bs.config.readTimeout = (1<<63 - 1)
 		return nil
+	} else if seconds > maxSeconds {
+		return fmt.Errorf("SetReadTimeout(): number of seconds to large to fit in time.Duration ")
 	}
 
-	bs.config.readTimeout = timeout
+	bs.config.readTimeout = time.Duration(seconds) * time.Second
 	return nil
 }
 
 // SetWriteTimeout set the maximum duration in seconds the server has to respond.
 // If it is exceeded server respond with 500 code.
 // Zero or negative value means there will be no timeout.
-func (bs *buggyInstance) SetWriteTimeout(timeout time.Duration) error {
+func (bs *buggyInstance) SetWriteTimeout(seconds int) error {
 	if bs.listener != nil {
 		return fmt.Errorf("SetWriteTimeout(): BuggyServer has already been started, you can no longer change its configuration")
 	}
-	if timeout <= 0 {
+
+	maxSeconds := (1<<63 - 1) / int(math.Pow(10, 9))
+
+	if seconds <= 0 {
 		bs.config.writeTimeout = (1<<63 - 1)
 		return nil
+	} else if seconds > maxSeconds {
+		return fmt.Errorf("SetWriteTimeout(): number of seconds to large to fit in time.Duration")
 	}
 
-	bs.config.writeTimeout = timeout
+	bs.config.writeTimeout = time.Duration(seconds) * time.Second
 	return nil
 }
 
@@ -187,8 +197,6 @@ func (bs *buggyInstance) handleConnection(conn net.Conn) {
 		}
 	}()
 
-	firstRequest := true
-
 	bufReader := bufio.NewReader(conn)
 
 	for {
@@ -216,12 +224,10 @@ func (bs *buggyInstance) handleConnection(conn net.Conn) {
 			}
 
 			if headerFinder(request.headers, "connection", "close") {
-				addCloseConnection(response)
+				addCloseConnectionHeader(response)
 
-			} else if _, ok := response.headers["connection"]; !ok && firstRequest {
-				firstRequest = false
-			} else if firstRequest {
-				firstRequest = false
+			} else if _, ok := response.headers["connection"]; !ok {
+				addKeepAliveHeaders(response, int(bs.config.readTimeout))
 			}
 		}
 

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/raw-phil/bs/buggy_http"
 )
@@ -44,12 +43,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := bs.SetReadTimeout(time.Duration(*readTimeout)); err != nil {
+	if err := bs.SetReadTimeout(*readTimeout); err != nil {
 		fmt.Printf("error: %s\n", err.Error())
 		os.Exit(1)
 	}
 
-	if err := bs.SetWriteTimeout(time.Duration(*writeTimeout)); err != nil {
+	if err := bs.SetWriteTimeout(*writeTimeout); err != nil {
 		fmt.Printf("error: %s\n", err.Error())
 		os.Exit(1)
 	}

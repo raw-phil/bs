@@ -2,6 +2,7 @@ package buggy_http
 
 import (
 	"fmt"
+	"math"
 	net_http "net/http"
 	"net/url"
 	"os"
@@ -47,7 +48,7 @@ func generateResponse(request *request, t time.Duration, baseDir string) (*respo
 func reply(request *request, baseDir string) (*response, error) {
 
 	if request.proto != "HTTP/1.1" {
-		return addCloseConnection(r505()), fmt.Errorf("reply() -> %s, %s: HTTP version not supported. 505 sent", request.method, request.path)
+		return addCloseConnectionHeader(r505()), fmt.Errorf("reply() -> %s, %s: HTTP version not supported. 505 sent", request.method, request.path)
 	}
 
 	switch request.method {
@@ -326,7 +327,16 @@ func r505() *response {
 }
 
 // Add 'connection: close' header to a response
-func addCloseConnection(r *response) *response {
+func addCloseConnectionHeader(r *response) *response {
 	r.headers["connection"] = []string{"close"}
+	return r
+}
+
+// Add 'connection: keep-alive' and 'keep-alive: timeout=X, max=10' headers to a response
+func addKeepAliveHeaders(r *response, timeout int) *response {
+	r.headers["connection"] = []string{"keep-alive"}
+	if timeout != (1<<63 - 1) {
+		r.headers["keep-alive"] = []string{fmt.Sprintf("timeout=%d", timeout/int(math.Pow(10, 9)))}
+	}
 	return r
 }
