@@ -1,6 +1,7 @@
 package buggy_http
 
 import (
+	"math"
 	"net"
 	"testing"
 	"time"
@@ -10,8 +11,8 @@ import (
 
 func TestStartBuggyServer(t *testing.T) {
 	t.Run("missing baseDir", func(t *testing.T) {
-		bs := &BuggyInstance{
-			config: &BuggyConfig{
+		bs := &buggyInstance{
+			config: &buggyConfig{
 				baseDir:       "",
 				readTimeout:   10,
 				writeTimeout:  10,
@@ -25,8 +26,8 @@ func TestStartBuggyServer(t *testing.T) {
 	})
 
 	t.Run("missing readTimeout", func(t *testing.T) {
-		bs := &BuggyInstance{
-			config: &BuggyConfig{
+		bs := &buggyInstance{
+			config: &buggyConfig{
 				baseDir:       "./foo",
 				readTimeout:   0,
 				writeTimeout:  10,
@@ -41,11 +42,17 @@ func TestStartBuggyServer(t *testing.T) {
 }
 
 func TestSetReadTimeout(t *testing.T) {
-	bs := &BuggyInstance{config: &BuggyConfig{}}
+	bs := &buggyInstance{config: &buggyConfig{}}
 
 	t.Run("Error when listener is not nil", func(t *testing.T) {
 		bs.listener = &net.TCPListener{}
-		err := bs.SetReadTimeout(10 * time.Second)
+		err := bs.SetReadTimeout(10)
+		assert.Error(t, err)
+	})
+
+	t.Run("Error when seconds exceed the maximum that can be stored in time.Duration", func(t *testing.T) {
+		maxSeconds := (1<<63 - 1) / int(math.Pow(10, 9))
+		err := bs.SetReadTimeout(maxSeconds + 1)
 		assert.Error(t, err)
 	})
 
@@ -58,18 +65,24 @@ func TestSetReadTimeout(t *testing.T) {
 
 	t.Run("Success when listener is nil and timeout is positive", func(t *testing.T) {
 		bs.listener = nil
-		err := bs.SetReadTimeout(10 * time.Second)
+		err := bs.SetReadTimeout(10)
 		assert.NoError(t, err)
 		assert.Equal(t, 10*time.Second, bs.config.readTimeout)
 	})
 }
 
 func TestSetWriteTimeout(t *testing.T) {
-	bs := &BuggyInstance{config: &BuggyConfig{}}
+	bs := &buggyInstance{config: &buggyConfig{}}
 
 	t.Run("Error when listener is not nil", func(t *testing.T) {
 		bs.listener = &net.TCPListener{}
-		err := bs.SetWriteTimeout(10 * time.Second)
+		err := bs.SetWriteTimeout(10)
+		assert.Error(t, err)
+	})
+
+	t.Run("Error when seconds exceed the maximum that can be stored in time.Duration", func(t *testing.T) {
+		maxSeconds := (1<<63 - 1) / int(math.Pow(10, 9))
+		err := bs.SetWriteTimeout(maxSeconds + 1)
 		assert.Error(t, err)
 	})
 
@@ -82,14 +95,14 @@ func TestSetWriteTimeout(t *testing.T) {
 
 	t.Run("Success when listener is nil and timeout is positive", func(t *testing.T) {
 		bs.listener = nil
-		err := bs.SetWriteTimeout(10 * time.Second)
+		err := bs.SetWriteTimeout(10)
 		assert.NoError(t, err)
 		assert.Equal(t, 10*time.Second, bs.config.writeTimeout)
 	})
 }
 
 func TestSetmaxRequestMiB(t *testing.T) {
-	bs := &BuggyInstance{config: &BuggyConfig{}}
+	bs := &buggyInstance{config: &buggyConfig{}}
 
 	t.Run("Error when listener is not nil", func(t *testing.T) {
 		bs.listener = &net.TCPListener{}
@@ -113,7 +126,7 @@ func TestSetmaxRequestMiB(t *testing.T) {
 }
 
 func TestSetBaseDir(t *testing.T) {
-	bs := &BuggyInstance{config: &BuggyConfig{}}
+	bs := &buggyInstance{config: &buggyConfig{}}
 
 	t.Run("Error when listener is not nil", func(t *testing.T) {
 		bs.listener = &net.TCPListener{}
@@ -136,10 +149,10 @@ func TestSetBaseDir(t *testing.T) {
 
 func TestStopBuggyServer(t *testing.T) {
 	t.Run("Test when listener is nil", func(t *testing.T) {
-		bs := &BuggyInstance{
+		bs := &buggyInstance{
 			listener: nil,
 			quit:     make(chan struct{}),
-			config:   &BuggyConfig{},
+			config:   &buggyConfig{},
 		}
 		err := bs.StopBuggyServer()
 		assert.Error(t, err)
@@ -147,10 +160,10 @@ func TestStopBuggyServer(t *testing.T) {
 	})
 
 	t.Run("Test when quit is nil", func(t *testing.T) {
-		bs := &BuggyInstance{
+		bs := &buggyInstance{
 			listener: &net.TCPListener{},
 			quit:     nil,
-			config:   &BuggyConfig{},
+			config:   &buggyConfig{},
 		}
 		err := bs.StopBuggyServer()
 		assert.Error(t, err)
@@ -159,10 +172,10 @@ func TestStopBuggyServer(t *testing.T) {
 
 	t.Run("Test successful stop", func(t *testing.T) {
 		ln, _ := net.Listen("tcp", "127.0.0.1:0")
-		bs := &BuggyInstance{
+		bs := &buggyInstance{
 			listener: ln,
 			quit:     make(chan struct{}),
-			config:   &BuggyConfig{},
+			config:   &buggyConfig{},
 		}
 		err := bs.StopBuggyServer()
 		assert.NoError(t, err)
@@ -170,10 +183,10 @@ func TestStopBuggyServer(t *testing.T) {
 
 	t.Run("Test StopBuggyServer() called twice", func(t *testing.T) {
 		ln, _ := net.Listen("tcp", "127.0.0.1:0")
-		bs := &BuggyInstance{
+		bs := &buggyInstance{
 			listener: ln,
 			quit:     make(chan struct{}),
-			config:   &BuggyConfig{},
+			config:   &buggyConfig{},
 		}
 		_ = bs.StopBuggyServer()
 		err := bs.StopBuggyServer()
@@ -183,10 +196,10 @@ func TestStopBuggyServer(t *testing.T) {
 
 	t.Run("Test stop on already closed connection", func(t *testing.T) {
 		ln, _ := net.Listen("tcp", "127.0.0.1:8080")
-		bs := &BuggyInstance{
+		bs := &buggyInstance{
 			listener: ln,
 			quit:     make(chan struct{}),
-			config:   &BuggyConfig{},
+			config:   &buggyConfig{},
 		}
 		bs.listener.Close()
 		err := bs.StopBuggyServer()

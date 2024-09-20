@@ -9,6 +9,8 @@
                      |___/ |___/ |___/       
                      
 [![Go Reference](https://pkg.go.dev/badge/golang.org/x/example.svg)](https://pkg.go.dev/golang.org/x/example)
+[![Go Report Card](https://goreportcard.com/badge/github.com/raw-phil/bs)](https://goreportcard.com/report/github.com/raw-phil/bs)
+
 
 Free time project for learning [GO](https://go.dev/) language and something more about HTTP/1.1 protocol. 
 
@@ -33,8 +35,8 @@ I have followed the [HTTP/1.1 spec](https://www.rfc-editor.org/rfc/rfc9112), and
   - [OPTIONS](#options)
   - [Request and Response Timeout](#request-and-response-timeout)
   - [Request size limit](#reqest-size-limit)
+  - [Connection reuse and pipelining](#connection-reuse-and-pipelining)
 - [Functionalities: Not Yet Implemented](#hourglass-functionalities-not-yet-implemented)
-  - [Connection reuse](#connection-reuse)
   - [Level based logging](#level-based-logging)
 
 
@@ -129,7 +131,6 @@ date: Tue, 09 Apr 2024 10:35:37 GMT
 server: BuggyServer
 content-type: text/html; charset=utf-8
 content-length: 697
-connection: close
 
 <!DOCTYPE html>
 <html lang="en">
@@ -147,7 +148,6 @@ date: Tue, 09 Apr 2024 10:35:37 GMT
 server: BuggyServer
 content-type: text/html; charset=utf-8
 content-length: 697
-connection: close
 ```
 
 ### OPTIONS
@@ -162,7 +162,6 @@ allow: GET, HEAD, OPTIONS
 cache-control: max-age=604800
 date: Mon, 15 Apr 2024 11:50:58 GMT
 server: BuggyServer
-connection: close
 ```
 
 ### Request and Response Timeout
@@ -182,22 +181,49 @@ Zero or negative value means that there will be no timeout.
 BuggyServer use the `maxRequestMiB` field to set the maximum size of request the server will accept in MiB.    
 It indicates the amounts of MiB that could be read from the underling connection for each request.    
 Zero or negative value means there will be no maximum request size.
- 
+
+### Connection reuse and pipelining
+
+BuggyServer supports connection reuse, which allows multiple HTTP requests and responses to be sent over a single TCP connection.   
+The server sends the `connection: keep-alive` header and the `keep-alive` header with a timeout parameter ( equal to `ReadTimeout` )   
+that indicate the time in seconds that the server will allow an idle connection to remain open before it is closed.   
+
+Additionally, BuggyServer supports pipelined requests, which enable multiple HTTP requests to be sent in a single TCP connection   
+without waiting for the corresponding responses.   
+
+```bash
+$ echo -ne "GET /foo HTTP/1.1\r\n\r\nGET / HTTP/1.1\r\n\r\n" |  nc 127.0.0.1 8080
+
+HTTP/1.1 404 Not Found
+date: Fri, 20 Sep 2024 16:52:50 GMT
+server: BuggyServer
+connection: keep-alive
+
+HTTP/1.1 200 OK
+content-length: 684
+connection: keep-alive
+date: Fri, 20 Sep 2024 16:52:50 GMT
+server: BuggyServer
+content-type: text/html; charset=utf-8
+
+<!DOCTYPE html>
+<html lang="en">
+        . . . 
+</html>
+```
+
+> [!WARNING]
+> Although pipelined requests can improve performance by reducing latency, they are not widely used ([is not activated by default in modern browsers](https://developer.mozilla.org/en-US/docs/Web/HTTP/Connection_management_in_HTTP_1.x#http_pipelining))  
+> or recommended due to potential issues with head-of-line blocking and compatibility with some intermediaries and clients.   
+
+
 
 ## :hourglass: Functionalities: Not Yet Implemented
 
-### Connection reuse
-Actually BuggyServer does not support reuse of connection, after each response the server closes the connection and sends
-`connection: close` header in response.
-
-
 ### Level based logging
+
 Actually there are two type of log: 
 - error log, that are displayed every time that an exception occur in the process of replying to a request.
 - log in the format [ `client IP`, `method`, `path`, `status code sent`] that indicates the responses that the server sends.    
 
 Actually all logs are only printed to STDOUT.
-
-
-
-

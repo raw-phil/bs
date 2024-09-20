@@ -1,18 +1,21 @@
 package buggy_http
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
-// BuggyConfig is the struct that holds the configuration for a BuggyServer.
-type BuggyConfig struct {
+// [buggyConfig] is the struct that holds the configuration for a BuggyServer.
+type buggyConfig struct {
 	// The base directory from which static files will be served.
 	baseDir string
 
@@ -28,8 +31,8 @@ type BuggyConfig struct {
 	maxRequestMiB int
 }
 
-// BuggyInstance is the struct that implements the BuggyServer interface.
-type BuggyInstance struct {
+// [buggyInstance] is the struct that implements the BuggyServer interface.
+type buggyInstance struct {
 	// The net.Listener that accepts tcp connections.
 	listener net.Listener
 
@@ -37,12 +40,12 @@ type BuggyInstance struct {
 	quit chan struct{}
 
 	// The configuration settings for the server.
-	config *BuggyConfig
+	config *buggyConfig
 }
 
 type BuggyServer interface {
-	SetReadTimeout(timeout time.Duration) error
-	SetWriteTimeout(timeout time.Duration) error
+	SetReadTimeout(seconds int) error
+	SetWriteTimeout(seconds int) error
 	SetmaxRequestMiB(size int) error
 	SetBaseDir(path string) error
 	StartBuggyServer(host string, port uint) error
@@ -61,8 +64,8 @@ type BuggyServer interface {
 func NewBuggyServer() BuggyServer {
 
 	// default values
-	return &BuggyInstance{
-		config: &BuggyConfig{
+	return &buggyInstance{
+		config: &buggyConfig{
 			baseDir:       "./",
 			readTimeout:   (1<<63 - 1),
 			writeTimeout:  (1<<63 - 1),
@@ -81,7 +84,7 @@ func NewBuggyServer() BuggyServer {
 //
 //	host: The hostname or IP address on which the server should listen.
 //	port: The port number on which the server should listen.
-func (bs *BuggyInstance) StartBuggyServer(host string, port uint) error {
+func (bs *buggyInstance) StartBuggyServer(host string, port uint) error {
 
 	if bs.config.baseDir == "" ||
 		bs.quit == nil ||
@@ -108,39 +111,48 @@ func (bs *BuggyInstance) StartBuggyServer(host string, port uint) error {
 // SetReadTimeout set the maximum duration in seconds for reading the entire
 // request from the underling connection. If it is exceeded server respond with 408 code.
 // Zero or negative value means there will be no timeout.
-func (bs *BuggyInstance) SetReadTimeout(timeout time.Duration) error {
-
+func (bs *buggyInstance) SetReadTimeout(seconds int) error {
 	if bs.listener != nil {
 		return fmt.Errorf("SetReadTimeout(): BuggyServer has already been started, you can no longer change its configuration")
 	}
-	if timeout <= 0 {
+
+	maxSeconds := (1<<63 - 1) / int(math.Pow(10, 9))
+
+	if seconds <= 0 {
 		bs.config.readTimeout = (1<<63 - 1)
 		return nil
+	} else if seconds > maxSeconds {
+		return fmt.Errorf("SetReadTimeout(): number of seconds to large to fit in time.Duration ")
 	}
 
-	bs.config.readTimeout = timeout
+	bs.config.readTimeout = time.Duration(seconds) * time.Second
 	return nil
 }
 
 // SetWriteTimeout set the maximum duration in seconds the server has to respond.
 // If it is exceeded server respond with 500 code.
 // Zero or negative value means there will be no timeout.
-func (bs *BuggyInstance) SetWriteTimeout(timeout time.Duration) error {
+func (bs *buggyInstance) SetWriteTimeout(seconds int) error {
 	if bs.listener != nil {
 		return fmt.Errorf("SetWriteTimeout(): BuggyServer has already been started, you can no longer change its configuration")
 	}
-	if timeout <= 0 {
+
+	maxSeconds := (1<<63 - 1) / int(math.Pow(10, 9))
+
+	if seconds <= 0 {
 		bs.config.writeTimeout = (1<<63 - 1)
 		return nil
+	} else if seconds > maxSeconds {
+		return fmt.Errorf("SetWriteTimeout(): number of seconds to large to fit in time.Duration")
 	}
 
-	bs.config.writeTimeout = timeout
+	bs.config.writeTimeout = time.Duration(seconds) * time.Second
 	return nil
 }
 
 // SetmaxRequestMiB set the maximum size of request the server will accept in MiB.
 // Zero or negative value means there will be no maximum request size.
-func (bs *BuggyInstance) SetmaxRequestMiB(size int) error {
+func (bs *buggyInstance) SetmaxRequestMiB(size int) error {
 	if bs.listener != nil {
 		return fmt.Errorf("SetmaxRequestMiB(): BuggyServer has already been started, you can no longer change its configuration")
 	}
@@ -151,7 +163,7 @@ func (bs *BuggyInstance) SetmaxRequestMiB(size int) error {
 
 // SetBaseDir set the base directory from which static files will be served.
 // It accepts relative or absolute path.
-func (bs *BuggyInstance) SetBaseDir(path string) error {
+func (bs *buggyInstance) SetBaseDir(path string) error {
 	if bs.listener != nil {
 		return fmt.Errorf("SetBaseDir(): BuggyServer has already been started, you can no longer change its configuration")
 	}
@@ -177,56 +189,64 @@ func (bs *BuggyInstance) SetBaseDir(path string) error {
 
 }
 
-func (bs *BuggyInstance) handleConnection(conn net.Conn) {
-
-	conn.SetReadDeadline(time.Now().Add(bs.config.readTimeout))
+func (bs *buggyInstance) handleConnection(conn net.Conn) {
 
 	defer func() {
-
 		if err := conn.Close(); err != nil {
 			log.Printf("error: handleConnection(): conn.Close(): %s: %s", conn.RemoteAddr(), err.Error())
 		}
-
 	}()
 
-	var response *Response
+	bufReader := bufio.NewReader(conn)
 
-	var reader io.Reader = conn
+	for {
+		conn.SetReadDeadline(time.Now().Add(bs.config.readTimeout))
 
-	if bs.config.maxRequestMiB > 0 {
-		reader = io.LimitReader(conn, int64(bs.config.maxRequestMiB)*(1<<20))
-	}
+		var response *response
 
-	request, err := requestParser(reader)
-	if err != nil {
-		if errors.Is(err, io.EOF) {
-			log.Printf("error: handleConnection(): %s, the underlying connection is closed or the request exceeds maxRequestMiB", conn.RemoteAddr())
-			return
-		}
-		if errors.Is(err, os.ErrDeadlineExceeded) {
-			response = r408()
+		request, err := requestParser(bufReader, bs.config.maxRequestMiB)
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET) {
+				log.Printf("error: handleConnection(): %s:%s, the underlying connection is closed", err.Error(), conn.RemoteAddr())
+				break
+			}
+			if errors.Is(err, os.ErrDeadlineExceeded) {
+				response = r408()
+			} else {
+				response = r400()
+			}
+			log.Printf("error: handleConnection(): %s. %d sent", err.Error(), response.code)
+
 		} else {
-			response = r400()
-		}
-		log.Printf("error: handleConnection(): %s. %d sent", err.Error(), response.code)
+			response, err = generateResponse(request, bs.config.writeTimeout, bs.config.baseDir)
+			if err != nil {
+				log.Printf("error: handleConnection(): %s", err.Error())
+			}
 
-	} else {
-		response, err = generateResponse(request, bs.config.writeTimeout, bs.config.baseDir)
+			if headerFinder(request.headers, "connection", "close") {
+				addCloseConnectionHeader(response)
+
+			} else if _, ok := response.headers["connection"]; !ok {
+				addKeepAliveHeaders(response, int(bs.config.readTimeout))
+			}
+		}
+
+		err = sendResponse(conn, response)
 		if err != nil {
 			log.Printf("error: handleConnection(): %s", err.Error())
+		} else {
+			log.Printf("[ %s, %s, %s : %d ]", conn.RemoteAddr(), request.method, request.path, response.code)
 		}
-	}
 
-	err = sendResponse(conn, response)
-	if err != nil {
-		log.Printf("error: handleConnection(): %s", err.Error())
-	} else {
-		log.Printf("[ %s, %s, %s : %d ]", conn.RemoteAddr(), request.method, request.path, response.code)
+		if values, ok := response.headers["connection"]; ok && values[0] == "close" {
+			break
+		}
+
 	}
 
 }
 
-func (bs *BuggyInstance) listenForConn() {
+func (bs *buggyInstance) listenForConn() {
 	for {
 
 		conn, err := bs.listener.Accept()
@@ -247,7 +267,7 @@ func (bs *BuggyInstance) listenForConn() {
 
 }
 
-func (bs *BuggyInstance) StopBuggyServer() (err error) {
+func (bs *buggyInstance) StopBuggyServer() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("StopBuggyServer(): recovered panic: %s", r)
@@ -268,7 +288,7 @@ func (bs *BuggyInstance) StopBuggyServer() (err error) {
 	return nil
 }
 
-func sendResponse(conn net.Conn, response *Response) error {
+func sendResponse(conn net.Conn, response *response) error {
 	if _, err := conn.Write([]byte(serializeResponse(response))); err != nil {
 		return fmt.Errorf("sendResponse(): %s: %w", conn.RemoteAddr(), err)
 	}
