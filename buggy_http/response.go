@@ -229,9 +229,10 @@ func r400() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
-		"date":       {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
-		"server":     {"BuggyServer"},
-		"connection": {"close"},
+		"date":           {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
+		"server":         {"BuggyServer"},
+		"connection":     {"close"},
+		"content-length": {"0"},
 	}
 	return &response{
 		proto:        "HTTP/1.1",
@@ -246,8 +247,9 @@ func r404() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
-		"date":   {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
-		"server": {"BuggyServer"},
+		"date":           {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
+		"server":         {"BuggyServer"},
+		"content-length": {"0"},
 	}
 	return &response{
 		proto:        "HTTP/1.1",
@@ -262,9 +264,10 @@ func r405() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
-		"allow":  {"GET", "HEAD", "OPTIONS"},
-		"date":   {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
-		"server": {"BuggyServer"},
+		"allow":          {"GET", "HEAD", "OPTIONS"},
+		"date":           {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
+		"server":         {"BuggyServer"},
+		"content-length": {"0"},
 	}
 	return &response{
 		proto:        "HTTP/1.1",
@@ -279,9 +282,10 @@ func r408() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
-		"date":       {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
-		"server":     {"BuggyServer"},
-		"connection": {"close"},
+		"date":           {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
+		"server":         {"BuggyServer"},
+		"connection":     {"close"},
+		"content-length": {"0"},
 	}
 	return &response{
 		proto:        "HTTP/1.1",
@@ -296,9 +300,10 @@ func r500() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
-		"date":       {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
-		"server":     {"BuggyServer"},
-		"connection": {"close"},
+		"date":           {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
+		"server":         {"BuggyServer"},
+		"connection":     {"close"},
+		"content-length": {"0"},
 	}
 	return &response{
 		proto:        "HTTP/1.1",
@@ -313,9 +318,10 @@ func r505() *response {
 	t := time.Now().UTC()
 
 	headers := map[string][]string{
-		"date":       {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
-		"server":     {"BuggyServer"},
-		"connection": {"close"},
+		"date":           {t.Format("Mon, 02 Jan 2006 15:04:05 GMT")},
+		"server":         {"BuggyServer"},
+		"connection":     {"close"},
+		"content-length": {"0"},
 	}
 	return &response{
 		proto:        "HTTP/1.1",
