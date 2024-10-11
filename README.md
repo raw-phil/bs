@@ -12,9 +12,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/raw-phil/bs)](https://goreportcard.com/report/github.com/raw-phil/bs)
 
 
-Free time project for learning [GO](https://go.dev/) language and something more about HTTP/1.1 protocol. 
+Free time project to learn [GO](https://go.dev/) language and something more about HTTP/1.1 protocol. 
 
-BuggyServer is a minimal HTTP/1.1 server build from scratch that serves static files, it does not use any HTTP packages like [net/http](https://pkg.go.dev/net/http).
+BuggyServer is a minimal HTTP/1.1 server built from scratch that serves static files, it does not use any HTTP packages like [net/http](https://pkg.go.dev/net/http).
 
 I have followed the [HTTP/1.1 spec](https://www.rfc-editor.org/rfc/rfc9112), and [HTTP/1.1 Semantics](https://www.rfc-editor.org/rfc/rfc9110).
 
@@ -64,7 +64,7 @@ bs --help
   -no-banner
         Suppress the initial banner
   -read-timeout int
-        Maximum duration in seconds server has for reading the entire request from the underling connection.
+        Maximum duration in seconds server has for reading the entire request from the underlying connection.
         Zero or negative value means there will be no timeout. (default -1)
   -write-timeout int
         Maximum duration in seconds the server has to respond.
@@ -139,7 +139,7 @@ content-length: 697
 ```
 
 ### HEAD
-Same as GET, but does not send the response content, only the headers are sent in response.
+Same as GET, but does not send the response content, only headers are sent.
 ```bash
 $ curl -I 127.0.0.1:8080/
 
@@ -169,27 +169,27 @@ server: BuggyServer
 BuggyServer uses two fields to implement timeouts:
 
 - `ReadTimeout` set the maximum duration in seconds for reading the entire   
-request from the underling connection. If it is exceeded server responds with 408 code.    
+request from the underlying connection. If it is exceeded server responds with code 408.    
 Zero or negative value means that there will be no timeout.
 
-- `WriteTimeout` set the maximum duration in seconds that the server has to respond.   
-If it is exceeded server responds with 500 code.   
+- `WriteTimeout` set the maximum duration in seconds that the server has to respond within.   
+If it is exceeded server responds with code 500.   
 Zero or negative value means that there will be no timeout.
 
-### Reqest size limit
+### Request size limit
 
-BuggyServer use the `maxRequestMiB` field to set the maximum size of request the server will accept in MiB.    
-It indicates the amounts of MiB that could be read from the underling connection for each request.    
+
+The `maxRequestMiB` field sets the maximum MiB size the server will accept. 
+It indicates how many MiB could be read from the underlying connection for each request.
 Zero or negative value means there will be no maximum request size.
 
 ### Connection reuse and pipelining
 
 BuggyServer supports connection reuse, which allows multiple HTTP requests and responses to be sent over a single TCP connection.   
 The server sends the `connection: keep-alive` header and the `keep-alive` header with a timeout parameter ( equal to `ReadTimeout` )   
-that indicate the time in seconds that the server will allow an idle connection to remain open before it is closed.   
+that indicates the maximum time in seconds the server will keep an idle connection open before closing it"
 
-Additionally, BuggyServer supports pipelined requests, which enable multiple HTTP requests to be sent in a single TCP connection   
-without waiting for the corresponding responses.   
+Additionally, BuggyServer supports pipelined requests, which enable sending multiple HTTP requests in a single TCP connection without waiting for each response.  
 
 ```bash
 $ echo -ne "GET /foo HTTP/1.1\r\n\r\nGET / HTTP/1.1\r\n\r\n" |  nc 127.0.0.1 8080
@@ -222,8 +222,8 @@ content-type: text/html; charset=utf-8
 
 ### Level based logging
 
-Actually there are two type of log: 
-- error log, that are displayed every time that an exception occur in the process of replying to a request.
-- log in the format [ `client IP`, `method`, `path`, `status code sent`] that indicates the responses that the server sends.    
+Currently there are two type of log: 
+- error log, that is displayed every time an exception occurs while replying to a request.
+- log in the format [ `client IP`, `method`, `path`, `status code sent`] that indicates the responses the server sends.    
 
-Actually all logs are only printed to STDOUT.
+All logs are only printed to STDOUT.
